@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-pvc
+  namespace: llm
+  labels:
+    app: ollama
+    app.kubernetes.io/part-of: llm-devops-project
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-pvc
+  namespace: llm
+  labels:
+    app: open-webui
+    app.kubernetes.io/part-of: llm-devops-project
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llm-config
+  namespace: llm
+  labels:
+    app.kubernetes.io/part-of: llm-devops-project
+data:
+  OLLAMA_HOST: "0.0.0.0:11434"
+  OLLAMA_MODELS: "/root/.ollama/models"
+  OLLAMA_KEEP_ALIVE: "24h"
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  WEBUI_PORT: "8080"

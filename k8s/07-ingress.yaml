@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openwebui-ingress
+  namespace: llm
+  labels:
+    app: open-webui
+    app.kubernetes.io/part-of: llm-devops-project
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - host: openwebui.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: openwebui-service
+                port:
+                  number: 8080
