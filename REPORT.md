@@ -2,7 +2,7 @@
 
 ---
 
-**Auteur :** Souleymane Sow (DIC2 - Informatique)  
+**Auteur :** Mouhamadou Abdoulaye Sow (DIC2 - Informatique)  
 **Projet :** Déploiement et Orchestration d'un LLM Open-Source avec Docker Compose et Kubernetes  
 **Enseignant :** M. Ibrahima Mbengue  
 **Dépôt GitHub :** [https://github.com/cloudDevML/LLM_Deployment_Devops_Project-Public](https://github.com/cloudDevML/LLM_Deployment_Devops_Project-Public)  
