@@ -106,6 +106,32 @@ LLM_Deployment_Devops_Project/
 
 ---
 
+### ⭐ Bonus : Démonstration du Horizontal Pod Autoscaler (HPA)
+
+1. **Vérifier l'état de l'HPA au repos :**
+   ```bash
+   kubectl get hpa -n llm
+   ```
+
+2. **Ouvrir la surveillance continue (Terminal 1) :**
+   ```bash
+   kubectl get hpa -n llm -w
+   ```
+   *(Capture disponible : `capture_Lab/record_hpa_1.png`)*
+
+3. **Générer un pic de trafic HTTP (Terminal 2) :**
+   ```bash
+   kubectl run load-test --rm -it --image=busybox --restart=Never -n llm -- /bin/sh -c "while true; do wget -q -O- http://openwebui-service:8080/health > /dev/null; done"
+   ```
+   *(Capture disponible : `capture_Lab/record_hpa_2.png`)*
+
+4. **Résultat observé :**
+   - La charge CPU grimpe à plus de 150%.
+   - L'HPA déclenche automatiquement le scale-up de 1 à 3 réplicas.
+   - À l'arrêt du trafic (`Ctrl + C`), après la période de stabilisation (5 minutes), l'HPA redescend automatiquement à 1 réplica (*scale-down*).
+
+---
+
 ## 📄 Rapport Technique
 
-Consultez le fichier [REPORT.md](REPORT.md) pour l'analyse théorique et les réponses détaillées aux questions du projet.
+Consultez le fichier [REPORT.md](REPORT.md) pour l'analyse théorique approfondie, les diagrammes d'architecture et les 9 figures de démonstration.

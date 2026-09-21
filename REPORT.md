@@ -376,12 +376,63 @@ spec:
 ```
 **Impact sécuritaire** : Seuls les Pods portant le label `app: open-webui` sont autorisés à communiquer avec Ollama sur le port `11434`. Tout autre pod compromis dans le cluster se verra refuser l'accès.
 
-### 3. Autoscaling Horizontal des Pods (`k8s/09-hpa.yaml`)
-Un contrôleur HPA (*Horizontal Pod Autoscaler*) a été configuré pour surveiller la consommation CPU d'Open WebUI :
-- Réplicas minimum : 1
-- Réplicas maximum : 3
-- Seuil de déclenchement : 75% d'utilisation CPU moyenne.
-Dès qu'une augmentation de requêtes web est détectée par le `metrics-server`, Kubernetes déploie automatiquement de nouvelles instances pour garantir la fluidité de l'expérience utilisateur.
+### 3. Autoscaling Horizontal des Pods (HPA) : Implémentation et Démonstration Complète
+
+L'élasticité applicative est assurée par un contrôleur **Horizontal Pod Autoscaler (HPA)** configuré pour le déploiement `openwebui-deployment`. Pour prouver et valider le comportement élastique de Kubernetes, une double démonstration a été réalisée : injection de charge via un conteneur éphémère (Terminal 2) et surveillance continue du cycle d'autoscaling (Terminal 1).
+
+#### Spécifications de l'HPA Déployé
+- **Cible de scaling** : `Deployment/openwebui-deployment`
+- **Métrique surveillée** : Consommation CPU avec un seuil cible à **50%** (via `--cpu=50%` et `autoscaling/v2`)
+- **Bornes de dimensionnement** : `minReplicas: 1`, `maxReplicas: 3`
+- **Sondes et métriques sous-jacentes** : Le `metrics-server` agrège la consommation CPU en continu et la rapporte à la requête déclarée (`requests.cpu: 250m`).
+
+---
+
+#### Amélioration 1 : Surveillance du Cycle Complet de l'HPA (Terminal 1)
+
+Dans le premier terminal, la commande `kubectl get hpa -n llm -w` a été exécutée pour enregistrer en continu l'intégralité du cycle de vie de l'autoscaling :
+
+<div align="center">
+  <img src="capture_Lab/record_hpa_1.png" alt="Démonstration HPA Terminal 1 - Scale-up et Scale-down" width="95%"/>
+  <p><em>Figure 8 : Terminal 1 (record_hpa_1.png) – Cycle complet HPA : Repos (1 pod) ➔ Pic de charge (153% - 176%) ➔ Scale-Up automatique (3 pods) ➔ Période de stabilisation (5 min) ➔ Scale-Down automatique (1 pod).</em></p>
+</div>
+
+**Analyse technique de la chronologie observée :**
+1. **État initial au repos (8m40s - 9m15s)** :
+   - Consommation CPU minimale : `cpu: 2%/50%`.
+   - Nombre d'instances : `REPLICAS: 1`.
+2. **Détection du pic de charge (10m - 11m)** :
+   - Dès l'injection du trafic HTTP, la charge CPU bondit instantanément à **`153%`**, puis culmine à **`176%`** (bien au-delà du seuil de 50%).
+   - L'algorithme de contrôle de l'HPA calcule immédiatement le besoin en instances supplémentaires :
+     $$\text{Replicas désirés} = \lceil 1 \times \frac{176\%}{50\%} \rceil = \lceil 3.52 \rceil \longrightarrow 3 \text{ réplicas (plafond MAXPODS)}$$
+   - Le champ `REPLICAS` bascule automatiquement de **1 à 3**. Deux nouveaux pods (`openwebui-deployment-...`) sont créés en parallèle et passent à l'état `1/1 Running`.
+3. **Période de refroidissement et stabilisation anti-battement (*Anti-Thrashing / Cooldown*) (12m - 17m)** :
+   - Dès l'arrêt de la génération de trafic, la charge CPU mesurée retombe immédiatement à `3%`, puis `1% - 2%`.
+   - **Comportement remarquable de Kubernetes** : Le contrôleur HPA ne détruit **pas** immédiatement les pods. Il respecte une fenêtre de stabilisation (*stabilization window* de 300 secondes / 5 minutes) afin d'éviter le phénomène néfaste de battement (*flapping*), où des conteneurs seraient créés et détruits en boucle lors de variations rapides de charge.
+4. **Désescalade automatique (*Scale-Down*) (17m - 21m)** :
+   - À l'issue des 5 minutes de stabilité sous le seuil cible, l'HPA ordonne la terminaison propre des pods excédentaires.
+   - Le cluster revient de manière fluide et économique à son état de repos : `REPLICAS: 1`, avec une consommation de `cpu: 2%/50%`.
+
+---
+
+#### Amélioration 2 : Injection de Charge Continue en Conteneur Éphémère (Terminal 2)
+
+Pour simuler un afflux massif et simultané d'utilisateurs sur l'interface d'IA sans installer d'outil externe sur la machine hôte, un pod de test de charge éphémère a été déployé directement au sein du namespace `llm` :
+
+```bash
+kubectl run load-test --rm -it --image=busybox --restart=Never -n llm -- /bin/sh -c "while true; do wget -q -O- http://openwebui-service:8080/health > /dev/null; done"
+```
+
+<div align="center">
+  <img src="capture_Lab/record_hpa_2.png" alt="Démonstration HPA Terminal 2 - Génération de charge HTTP" width="95%"/>
+  <p><em>Figure 9 : Terminal 2 (record_hpa_2.png) – Générateur de charge HTTP interactif avec busybox saturant le service Open WebUI, suivi de l'interruption propre (Ctrl+C).</em></p>
+</div>
+
+**Analyse de l'exécution :**
+1. **Isolation et légèreté** : Le conteneur `busybox` exécute une boucle `while true` saturant le endpoint `/health` du service Kubernetes `openwebui-service:8080`.
+2. **Routage L4 équilibré** : Grâce au service `openwebui-service`, dès que les 2 nouveaux pods sont déclarés `Ready (1/1)`, le trafic HTTP généré est automatiquement réparti entre les 3 instances, augmentant la résilience globale.
+3. **Nettoyage automatique** : L'utilisation de `--rm` et `--restart=Never` garantit qu'à l'interruption (`Ctrl + C`), le pod de test est immédiatement purgé du cluster sans laisser de traces (`pod "load-test" deleted from llm namespace`).
+
 
 ---
 
