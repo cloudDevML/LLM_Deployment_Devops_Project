@@ -3,6 +3,10 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: openwebui-hpa
   namespace: llm
+  labels:
+    app: open-webui
+    app.kubernetes.io/part-of: llm-devops-project
+    app.kubernetes.io/component: autoscaler
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -16,4 +20,31 @@ spec:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 75
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 2
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min

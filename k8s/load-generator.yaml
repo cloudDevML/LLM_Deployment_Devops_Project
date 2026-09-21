@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: openwebui-load-generator
+  namespace: llm
+  labels:
+    app: load-generator
+spec:
+  ttlSecondsAfterFinished: 120
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: load-generator
+          image: busybox:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Sending continuous HTTP requests to trigger HPA scaling..."
+              END=$((SECONDS+180))
+              while [ $SECONDS -lt $END ]; do
+                for i in $(seq 1 30); do
+                  wget -q -O- http://openwebui-service:8080/health > /dev/null 2>&1 &
+                done
+                sleep 0.1
+              done
+              wait
+              echo "Load test finished."
+      restartPolicy: Never
+  backoffLimit: 1
